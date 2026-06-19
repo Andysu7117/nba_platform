@@ -1,7 +1,7 @@
 import { Icon } from "./Icon";
 import { useTheme } from "../context/ThemeContext";
 import type { PageId } from "../App";
-import { longDate, parseISO } from "../lib/format";
+import { longDate } from "../lib/format";
 
 interface NavItem {
   id: PageId;
@@ -21,14 +21,13 @@ export function Sidebar({
   page,
   onNavigate,
   season,
-  latestDate,
 }: {
   page: PageId;
   onNavigate: (p: PageId) => void;
   season: string | null;
-  latestDate: string | null;
 }) {
   const { theme, toggle } = useTheme();
+  const today = new Date();
 
   return (
     <aside className="sidebar">
@@ -57,12 +56,10 @@ export function Sidebar({
 
       <div className="sidebar-foot">
         <div className="live-box">
-          <div className="live-label">LATEST RESULTS</div>
+          <div className="live-label">TODAY</div>
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span className="dot" style={{ background: "var(--accent)" }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>
-              {latestDate ? longDate(parseISO(latestDate)) : "No games cached"}
-            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{longDate(today)}</span>
           </div>
         </div>
         <button className="theme-toggle" onClick={toggle}>

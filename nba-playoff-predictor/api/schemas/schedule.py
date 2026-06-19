@@ -12,6 +12,7 @@ class GameSummary(BaseModel):
     game_id: str
     date: str  # YYYY-MM-DD
     status: str  # "scheduled" | "live" | "final"
+    status_text: str | None = None  # e.g. "7:00 pm ET" / "Q3 5:23" / "Final"
     home: TeamRef
     away: TeamRef
     home_score: int | None = None

@@ -1,9 +1,11 @@
-"""Schedule service: games by date (with model win probabilities) + box scores.
+"""Schedule service: live games by date (with model win probabilities) + box scores.
 
-Games are sourced from the cached team-game logs, which carry real matchups and
-final scores, so the Current Season view works fully offline. Per-game win
-probabilities come from the trained model when available. Detailed box scores are
-fetched live from the NBA API and degrade gracefully when it is unreachable.
+Games come from the NBA **scoreboard** endpoint so the view reflects real
+scheduled / live / final games for any date. Today's scoreboard is always
+re-fetched (scores change through the day); past dates are served from cache
+(finals never change) unless an explicit refresh is requested. Per-game win
+probabilities come from the trained model. Detailed box scores are fetched live
+and degrade gracefully when the NBA API is unreachable.
 """
 from __future__ import annotations
 
@@ -23,7 +25,25 @@ from api.schemas.schedule import (
     ScheduleResponse,
 )
 from api.services import data, standings
+from src.ingest.fetch_scoreboard import (
+    STATUS_FINAL,
+    STATUS_LIVE,
+    fetch_scoreboard,
+)
 from src.models.predict import predict_home_win_probability
+
+_STATUS_MAP = {1: "scheduled", STATUS_LIVE: "live", STATUS_FINAL: "final"}
+
+
+def _today() -> dt.date:
+    return dt.date.today()
+
+
+def season_for_date(date: dt.date) -> str:
+    """The NBA season string ('2025-26') that a calendar date falls in."""
+    # Seasons start in October; Jan–Sep belong to the season that began the prior year.
+    start_year = date.year if date.month >= 10 else date.year - 1
+    return f"{start_year}-{(start_year + 1) % 100:02d}"
 
 
 def _team_ref(team_id: int, records: dict[int, str]) -> TeamRef:
@@ -36,74 +56,88 @@ def _team_ref(team_id: int, records: dict[int, str]) -> TeamRef:
                    conference=meta.conference, color=meta.color, record=record)
 
 
-def _games_on(date: dt.date) -> pd.DataFrame:
-    rows = data.game_rows()
-    if rows.empty:
-        return rows
-    mask = pd.to_datetime(rows["GAME_DATE"]).dt.date == date
-    return rows[mask].sort_values("GAME_ID")
+def _opt_int(value) -> int | None:
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
-def get_schedule(date: dt.date) -> ScheduleResponse:
-    games_df = _games_on(date)
-    if games_df.empty:
+def _fetch_day(date: dt.date, refresh: bool) -> pd.DataFrame:
+    """Fetch a single day's scoreboard, always refreshing today's live data."""
+    force = refresh or date == _today()
+    return fetch_scoreboard(date.isoformat(), force_refresh=force)
+
+
+def get_schedule(date: dt.date, refresh: bool = False) -> ScheduleResponse:
+    # Keep the current season's standings/records/predictions current (once/day).
+    data.ensure_fresh_current_season()
+
+    games_df = _fetch_day(date, refresh)
+    if games_df is None or games_df.empty:
         return ScheduleResponse(date=date.isoformat(), games=[])
 
-    season = games_df["SEASON"].iloc[0]
-    records = standings.team_record_map(season)
+    records = standings.team_record_map(season_for_date(date))
     model = data.get_model()
     dataset = data.modeling_dataset()
     can_predict = model is not None and not dataset.empty
 
     summaries: list[GameSummary] = []
     for row in games_df.itertuples(index=False):
-        home_id, away_id = int(row.HOME_TEAM_ID), int(row.AWAY_TEAM_ID)
-        home_score, away_score = int(row.HOME_SCORE), int(row.AWAY_SCORE)
+        home_id, away_id = _opt_int(getattr(row, "HOME_TEAM_ID", None)), _opt_int(getattr(row, "AWAY_TEAM_ID", None))
+        if home_id is None or away_id is None:
+            continue  # skip non-standard entries (e.g. all-star) with no team ids
+        status = _STATUS_MAP.get(_opt_int(getattr(row, "GAME_STATUS_ID", 1)) or 1, "scheduled")
+        home_score, away_score = _opt_int(getattr(row, "HOME_PTS", None)), _opt_int(getattr(row, "AWAY_PTS", None))
+
         p_home = None
         if can_predict:
             try:
-                p_home = round(
-                    float(predict_home_win_probability(home_id, away_id, dataset, model=model)), 4
-                )
+                p_home = round(float(predict_home_win_probability(home_id, away_id, dataset, model=model)), 4)
             except Exception:  # noqa: BLE001 - prediction is best-effort
                 p_home = None
+
+        winner = None
+        if status == "final" and home_score is not None and away_score is not None:
+            winner = "home" if home_score > away_score else "away"
+
         summaries.append(
             GameSummary(
                 game_id=str(row.GAME_ID),
                 date=date.isoformat(),
-                status="final",
+                status=status,
+                status_text=getattr(row, "GAME_STATUS_TEXT", None) or None,
                 home=_team_ref(home_id, records),
                 away=_team_ref(away_id, records),
                 home_score=home_score,
                 away_score=away_score,
                 home_win_prob=p_home,
                 away_win_prob=None if p_home is None else round(1 - p_home, 4),
-                winner="home" if home_score > away_score else "away",
+                winner=winner,
             )
         )
     return ScheduleResponse(date=date.isoformat(), games=summaries)
 
 
 def get_calendar(start: dt.date, end: dt.date) -> CalendarResponse:
-    """Per-day game counts across an inclusive date range (for the week strip)."""
-    rows = data.game_rows()
-    counts: dict[str, int] = {}
-    if not rows.empty:
-        dates = pd.to_datetime(rows["GAME_DATE"]).dt.date
-        window = rows[(dates >= start) & (dates <= end)]
-        grouped = pd.to_datetime(window["GAME_DATE"]).dt.date.value_counts()
-        counts = {d.isoformat(): int(c) for d, c in grouped.items()}
-
+    """Per-day game counts across an inclusive range (for the week strip)."""
     days: list[DayCount] = []
     cur = start
     while cur <= end:
-        days.append(DayCount(date=cur.isoformat(), count=counts.get(cur.isoformat(), 0)))
+        try:
+            df = _fetch_day(cur, refresh=False)
+            count = 0 if df is None else int(len(df))
+        except Exception:  # noqa: BLE001 - one bad day shouldn't sink the strip
+            count = 0
+        days.append(DayCount(date=cur.isoformat(), count=count))
         cur += dt.timedelta(days=1)
     return CalendarResponse(days=days)
 
 
 def latest_game_date() -> dt.date | None:
-    """The most recent date with cached games (used as the UI's default 'today')."""
+    """Most recent date with cached *completed* games (used for app metadata)."""
     rows = data.game_rows()
     if rows.empty:
         return None
@@ -140,7 +174,7 @@ def _box_team(box_df: pd.DataFrame, team_id: int, score: int | None,
 
 
 def get_box_score(game_id: str) -> BoxScoreResponse:
-    # Locate the game in the cache to recover the two teams and final score.
+    # Locate the game in the cached completed games to recover teams/score.
     rows = data.game_rows()
     match = rows[rows["GAME_ID"].astype(str) == str(game_id)] if not rows.empty else rows
     home_id = away_id = None
@@ -167,16 +201,14 @@ def get_box_score(game_id: str) -> BoxScoreResponse:
         )
 
     if box_df.empty:
-        # The NBA API has no per-player box score for this game id.
         return BoxScoreResponse(
             game_id=str(game_id), status="final", available=False,
-            message="Player box score is not available for this game.",
+            message="Player box score is not available for this game yet.",
             home=(_box_empty(home_id, home_score, records) if home_id else None),
             away=(_box_empty(away_id, away_score, records) if away_id else None),
         )
 
     if home_id is None:
-        # Game not in local cache; infer teams from the box score itself.
         ids = [int(t) for t in box_df["TEAM_ID"].unique()[:2]]
         home_id, away_id = (ids + [None, None])[:2]
 

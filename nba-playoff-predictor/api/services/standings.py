@@ -88,6 +88,9 @@ def _compute_rows(season: str) -> list[dict]:
 def get_standings(conference: str, season: str | None = None) -> StandingsResponse:
     """Return ranked standings for ``East`` | ``West`` | ``League``."""
     season = season or data.CURRENT_SEASON
+    # Keep the live season current; past seasons are static so skip the refresh.
+    if season == data.CURRENT_SEASON:
+        data.ensure_fresh_current_season()
     conference = conference.title() if conference.lower() != "league" else "League"
 
     all_rows = _compute_rows(season)

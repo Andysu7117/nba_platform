@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { TeamChip } from "../components/TeamChip";
+import { SeasonSelect } from "../components/SeasonSelect";
 import { EmptyState, ErrorState, Spinner } from "../components/common";
 import { pctRaw, signed } from "../lib/format";
 import type { StandingRow } from "../api/types";
@@ -13,7 +14,8 @@ const NUM_COLS = ["W", "L", "PCT", "GB", "STRK", "L10", "ORTG", "DRTG", "NET"];
 
 export function TeamStats() {
   const [conf, setConf] = useState<Conf>("East");
-  const { data, loading, error, reload } = useAsync(() => api.standings(conf), [conf]);
+  const [season, setSeason] = useState<string | undefined>(undefined);
+  const { data, loading, error, reload } = useAsync(() => api.standings(conf, season), [conf, season]);
 
   return (
     <div className="page">
@@ -22,12 +24,15 @@ export function TeamStats() {
           <div className="eyebrow">STANDINGS</div>
           <h1 className="h1">Team Stats</h1>
         </div>
-        <div className="seg-group">
-          {CONFS.map((c) => (
-            <button key={c} className={`seg${conf === c ? " active" : ""}`} onClick={() => setConf(c)}>
-              {c}
-            </button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <SeasonSelect value={season} onChange={setSeason} />
+          <div className="seg-group">
+            {CONFS.map((c) => (
+              <button key={c} className={`seg${conf === c ? " active" : ""}`} onClick={() => setConf(c)}>
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

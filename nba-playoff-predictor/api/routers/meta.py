@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.app_helpers import load_saved_metrics
+from src.config import DEFAULT_SEASONS
 
 from api.schemas.common import ModelStatus
 from api.services import data, schedule
@@ -19,9 +20,20 @@ class AppMeta(BaseModel):
     has_data: bool
 
 
+class SeasonsResponse(BaseModel):
+    current: str
+    seasons: list[str]  # newest first
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/seasons", response_model=SeasonsResponse)
+def seasons() -> SeasonsResponse:
+    """Selectable seasons, newest first."""
+    return SeasonsResponse(current=data.CURRENT_SEASON, seasons=list(reversed(DEFAULT_SEASONS)))
 
 
 @router.get("/meta", response_model=AppMeta)

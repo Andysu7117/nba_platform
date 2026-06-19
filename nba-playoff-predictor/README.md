@@ -84,19 +84,35 @@ All routes are mounted under `/api`; interactive docs live at `/api/docs`.
 | ------ | --------------------------------- | ---------------------------------------- |
 | GET    | `/meta`                           | Current season, latest date, model flags |
 | GET    | `/meta/model`                     | Trained-model metrics                    |
+| GET    | `/seasons`                        | Selectable seasons (newest first)        |
 | GET    | `/teams`                          | All 30 teams + current records           |
-| GET    | `/standings?conference=East`      | Conference / league standings            |
-| GET    | `/schedule?date=YYYY-MM-DD`       | Games for a date (+ model win prob)      |
+| GET    | `/standings?conference=East&season=` | Conference / league standings         |
+| GET    | `/schedule?date=YYYY-MM-DD&refresh=` | Live games for a date (+ win prob)    |
 | GET    | `/schedule/calendar?start=&end=`  | Per-day game counts (week strip)         |
-| GET    | `/games/{game_id}/boxscore`       | Player box score for a finished game     |
+| GET    | `/games/{game_id}/boxscore`       | Player box score for a game              |
 | POST   | `/predict`                        | Win prob, projected score, key factors   |
-| GET    | `/playoffs/seeds`                 | Default top-8 seeds per conference        |
+| GET    | `/playoffs/seeds?season=`         | Default top-8 seeds per conference        |
 | POST   | `/playoffs/simulate`              | Monte-Carlo bracket + championship odds  |
-| GET    | `/players`                        | League per-game leaderboard + leaders    |
+| GET    | `/players?season=`                | League per-game leaderboard + leaders    |
+| GET    | `/players/search?q=`              | Search the player directory              |
+| GET    | `/players/{id}?season=&season_type=&per_mode=` | Game log + career tables    |
 
-Standings, schedule, predictions and playoff simulation run **fully offline**
-from the cached parquet data. Box scores and the player leaderboard fetch live
-from the NBA API and degrade gracefully when it is unreachable.
+**Live data.** The schedule reads the NBA **scoreboard** for the requested date,
+so the Current Season page shows real scheduled / live / final games and defaults
+to the system clock's "today". Today's data is re-fetched on every load (scores
+change live); past dates are cached. The current season's team data also
+auto-refreshes once per day so standings, records and predictions stay current.
+For a deterministic out-of-band refresh, run `python -m scripts.daily_refresh`
+from a scheduler (cron / Windows Task Scheduler).
+
+**Previous seasons.** Standings, the player leaderboard, individual player detail
+and the playoff simulator all take a `season` and can browse any configured
+season. Player detail also toggles Regular Season / Playoffs and Per-Game /
+Totals.
+
+Predictions and standings work offline from cached parquet data; the scoreboard,
+box scores, player leaderboard and player detail fetch live from the NBA API and
+degrade gracefully when it is unreachable.
 
 ---
 

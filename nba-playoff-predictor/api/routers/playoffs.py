@@ -1,7 +1,7 @@
 """Playoff seeding and Monte-Carlo simulation."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from api.schemas.playoffs import SeedsResponse, SimulateRequest, SimulateResponse
 from api.services import playoffs as playoffs_service
@@ -10,8 +10,8 @@ router = APIRouter(prefix="/playoffs", tags=["playoffs"])
 
 
 @router.get("/seeds", response_model=SeedsResponse)
-def default_seeds() -> SeedsResponse:
-    return playoffs_service.get_default_seeds()
+def default_seeds(season: str | None = Query(None, description="defaults to current")) -> SeedsResponse:
+    return playoffs_service.get_default_seeds(season)
 
 
 @router.post("/simulate", response_model=SimulateResponse)

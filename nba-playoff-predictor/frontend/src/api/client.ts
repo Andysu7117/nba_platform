@@ -4,9 +4,12 @@ import type {
   BoxScoreResponse,
   CalendarResponse,
   ModelStatus,
+  PlayerDetailResponse,
+  PlayerSearchResult,
   PlayersResponse,
   PredictResponse,
   ScheduleResponse,
+  SeasonsResponse,
   SeedsResponse,
   SimulateResponse,
   StandingsResponse,
@@ -40,17 +43,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+const seasonQuery = (season?: string) => (season ? `&season=${season}` : "");
+
 export const api = {
   meta: () => request<AppMeta>("/meta"),
+  seasons: () => request<SeasonsResponse>("/seasons"),
   modelStatus: () => request<ModelStatus>("/meta/model"),
   teams: () => request<TeamRef[]>("/teams"),
 
   standings: (conference: string, season?: string) =>
-    request<StandingsResponse>(
-      `/standings?conference=${conference}${season ? `&season=${season}` : ""}`,
-    ),
+    request<StandingsResponse>(`/standings?conference=${conference}${seasonQuery(season)}`),
 
-  schedule: (date: string) => request<ScheduleResponse>(`/schedule?date=${date}`),
+  schedule: (date: string, refresh = false) =>
+    request<ScheduleResponse>(`/schedule?date=${date}${refresh ? "&refresh=true" : ""}`),
   calendar: (start: string, end: string) =>
     request<CalendarResponse>(`/schedule/calendar?start=${start}&end=${end}`),
   boxScore: (gameId: string) => request<BoxScoreResponse>(`/games/${gameId}/boxscore`),
@@ -61,13 +66,20 @@ export const api = {
       body: JSON.stringify({ home_abbr: homeAbbr, away_abbr: awayAbbr }),
     }),
 
-  seeds: () => request<SeedsResponse>("/playoffs/seeds"),
-  simulate: (nSimulations: number) =>
+  seeds: (season?: string) => request<SeedsResponse>(`/playoffs/seeds${season ? `?season=${season}` : ""}`),
+  simulate: (nSimulations: number, season?: string) =>
     request<SimulateResponse>("/playoffs/simulate", {
       method: "POST",
-      body: JSON.stringify({ n_simulations: nSimulations }),
+      body: JSON.stringify({ n_simulations: nSimulations, season }),
     }),
 
   players: (season?: string) =>
     request<PlayersResponse>(`/players${season ? `?season=${season}` : ""}`),
+  playerSearch: (q: string) =>
+    request<PlayerSearchResult[]>(`/players/search?q=${encodeURIComponent(q)}`),
+  playerDetail: (playerId: number, season?: string, seasonType = "Regular Season", perMode = "PerGame") =>
+    request<PlayerDetailResponse>(
+      `/players/${playerId}?season_type=${encodeURIComponent(seasonType)}&per_mode=${perMode}` +
+        (season ? `&season=${season}` : ""),
+    ),
 };

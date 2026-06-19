@@ -3,7 +3,9 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { TeamChip } from "../components/TeamChip";
 import { Icon } from "../components/Icon";
+import { SeasonSelect } from "../components/SeasonSelect";
 import { EmptyState, ErrorState, Spinner } from "../components/common";
+import { PlayerDetail } from "./PlayerDetail";
 import type { LeaderCard, PlayerRow } from "../api/types";
 
 type SortKey =
@@ -30,10 +32,16 @@ const COLUMNS: Column[] = [
 ];
 
 export function PlayerStats() {
-  const { data, loading, error, reload } = useAsync(() => api.players(), []);
+  const [season, setSeason] = useState<string | undefined>(undefined);
+  const [selected, setSelected] = useState<{ id: number; name: string } | null>(null);
+  const { data, loading, error, reload } = useAsync(() => api.players(season), [season]);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("points");
   const [sortDir, setSortDir] = useState<-1 | 1>(-1);
+
+  if (selected) {
+    return <PlayerDetail playerId={selected.id} initialName={selected.name} onBack={() => setSelected(null)} />;
+  }
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -54,9 +62,12 @@ export function PlayerStats() {
 
   return (
     <div className="page">
-      <div style={{ marginBottom: 22 }}>
-        <div className="eyebrow">LEAGUE LEADERS</div>
-        <h1 className="h1">Player Stats</h1>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">LEAGUE LEADERS</div>
+          <h1 className="h1">Player Stats</h1>
+        </div>
+        <SeasonSelect value={season} onChange={setSeason} />
       </div>
 
       {error && <ErrorState message={error} onRetry={reload} />}
@@ -113,7 +124,13 @@ export function PlayerStats() {
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <PlayerTableRow key={`${r.name}-${r.team_abbr}`} row={r} rank={i + 1} sortKey={sortKey} />
+                  <PlayerTableRow
+                    key={r.player_id || `${r.name}-${r.team_abbr}`}
+                    row={r}
+                    rank={i + 1}
+                    sortKey={sortKey}
+                    onSelect={() => setSelected({ id: r.player_id, name: r.name })}
+                  />
                 ))}
               </tbody>
             </table>
@@ -145,15 +162,25 @@ function LeaderCardView({ leader }: { leader: LeaderCard }) {
   );
 }
 
-function PlayerTableRow({ row, rank, sortKey }: { row: PlayerRow; rank: number; sortKey: SortKey }) {
+function PlayerTableRow({
+  row,
+  rank,
+  sortKey,
+  onSelect,
+}: {
+  row: PlayerRow;
+  rank: number;
+  sortKey: SortKey;
+  onSelect: () => void;
+}) {
   return (
-    <tr>
+    <tr style={{ cursor: "pointer" }} onClick={onSelect}>
       <td className="left" style={{ position: "sticky", left: 0, background: "inherit" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
           <span style={{ width: 22, fontWeight: 800, fontSize: 12, color: "var(--ink-3)" }}>{rank}</span>
           <TeamChip abbr={row.team_abbr} color={row.team_color} size="sm" />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{row.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--accent)" }}>{row.name}</div>
             <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 500 }}>{row.team_abbr}</div>
           </div>
         </div>

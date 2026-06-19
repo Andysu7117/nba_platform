@@ -23,8 +23,11 @@ def _parse_date(value: str) -> dt.date:
 
 
 @router.get("/schedule", response_model=ScheduleResponse)
-def get_schedule(date: str = Query(..., description="YYYY-MM-DD")) -> ScheduleResponse:
-    return schedule_service.get_schedule(_parse_date(date))
+def get_schedule(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    refresh: bool = Query(False, description="Force a live re-fetch, bypassing the cache"),
+) -> ScheduleResponse:
+    return schedule_service.get_schedule(_parse_date(date), refresh=refresh)
 
 
 @router.get("/schedule/calendar", response_model=CalendarResponse)

@@ -148,7 +148,7 @@ def _series_ref(detail: dict, records: dict[int, str]) -> SeriesResult:
 
 
 def simulate(req: SimulateRequest) -> SimulateResponse:
-    season = data.CURRENT_SEASON
+    season = req.season or data.CURRENT_SEASON
     records = standings.team_record_map(season)
     east_ids = _seed_map(req.east, "East", season)
     west_ids = _seed_map(req.west, "West", season)

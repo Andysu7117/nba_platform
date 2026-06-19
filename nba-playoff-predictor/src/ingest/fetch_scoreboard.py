@@ -38,14 +38,38 @@ def _normalise_scoreboard(header: pd.DataFrame, line: pd.DataFrame) -> pd.DataFr
             "GAME_DATE_EST",
         ]
     ].copy()
+    # The two endpoints can disagree on key dtypes (object vs int), which breaks
+    # the merges below. Normalise the join keys first.
+    gh["GAME_ID"] = gh["GAME_ID"].astype(str)
+    gh["HOME_TEAM_ID"] = pd.to_numeric(gh["HOME_TEAM_ID"], errors="coerce").astype("Int64")
+    gh["VISITOR_TEAM_ID"] = pd.to_numeric(gh["VISITOR_TEAM_ID"], errors="coerce").astype("Int64")
 
     ls = line.copy()
+    ls["GAME_ID"] = ls["GAME_ID"].astype(str)
+    ls["TEAM_ID"] = pd.to_numeric(ls["TEAM_ID"], errors="coerce").astype("Int64")
     ls["FULL_NAME"] = (
         ls["TEAM_CITY_NAME"].fillna("").str.strip()
         + " "
         + ls["TEAM_NAME"].fillna("").str.strip()
     ).str.strip()
     ls_small = ls[["GAME_ID", "TEAM_ID", "FULL_NAME", "TEAM_ABBREVIATION", "PTS"]]
+
+    # GameHeader occasionally leaves a side's team id null for upcoming games;
+    # the LineScore still lists both teams, so backfill the missing side there.
+    teams_by_game = ls.groupby("GAME_ID")["TEAM_ID"].apply(
+        lambda s: [t for t in s.tolist() if pd.notna(t)]
+    ).to_dict()
+
+    def _backfill(row: pd.Series) -> pd.Series:
+        ids = teams_by_game.get(row["GAME_ID"], [])
+        home, visitor = row["HOME_TEAM_ID"], row["VISITOR_TEAM_ID"]
+        if pd.isna(home) and pd.notna(visitor):
+            home = next((t for t in ids if t != visitor), home)
+        if pd.isna(visitor) and pd.notna(home):
+            visitor = next((t for t in ids if t != home), visitor)
+        return pd.Series({"HOME_TEAM_ID": home, "VISITOR_TEAM_ID": visitor})
+
+    gh[["HOME_TEAM_ID", "VISITOR_TEAM_ID"]] = gh.apply(_backfill, axis=1)
 
     home = ls_small.rename(
         columns={

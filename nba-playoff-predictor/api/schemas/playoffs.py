@@ -13,6 +13,7 @@ class SeedEntry(BaseModel):
 
 class SimulateRequest(BaseModel):
     n_simulations: int = Field(default=2000, ge=100, le=20000)
+    season: str | None = Field(default=None, description="Seed from this season; defaults to current")
     # Optional manual seeding; when omitted the server seeds from standings.
     east: list[SeedEntry] | None = None
     west: list[SeedEntry] | None = None

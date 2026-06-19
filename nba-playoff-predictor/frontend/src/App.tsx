@@ -17,12 +17,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar
-        page={page}
-        onNavigate={setPage}
-        season={meta.data?.current_season ?? null}
-        latestDate={meta.data?.latest_date ?? null}
-      />
+      <Sidebar page={page} onNavigate={setPage} season={meta.data?.current_season ?? null} />
       <main className="main">
         {meta.error && (
           <div className="page">
@@ -32,9 +27,7 @@ export default function App() {
             />
           </div>
         )}
-        {!meta.error && page === "season" && (
-          <CurrentSeason latestDate={meta.data?.latest_date ?? null} />
-        )}
+        {!meta.error && page === "season" && <CurrentSeason />}
         {!meta.error && page === "pred" && <GamePredictor />}
         {!meta.error && page === "playoff" && <PlayoffSimulator />}
         {!meta.error && page === "players" && <PlayerStats />}

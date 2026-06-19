@@ -17,6 +17,11 @@ export interface AppMeta {
   has_data: boolean;
 }
 
+export interface SeasonsResponse {
+  current: string;
+  seasons: string[];
+}
+
 export interface ModelStatus {
   trained: boolean;
   accuracy: number | null;
@@ -55,6 +60,7 @@ export interface GameSummary {
   game_id: string;
   date: string;
   status: GameStatus;
+  status_text: string | null;
   home: TeamRef;
   away: TeamRef;
   home_score: number | null;
@@ -157,6 +163,7 @@ export interface SimulateResponse {
 
 export interface PlayerRow {
   rank: number;
+  player_id: number;
   name: string;
   team_abbr: string;
   team_color: string;
@@ -189,4 +196,56 @@ export interface PlayersResponse {
   message: string | null;
   leaders: LeaderCard[];
   rows: PlayerRow[];
+}
+
+export interface PlayerSearchResult {
+  player_id: number;
+  full_name: string;
+  is_active: boolean | null;
+}
+
+export interface GameLogRow {
+  date: string;
+  matchup: string;
+  result: string | null;
+  minutes: number | null;
+  points: number | null;
+  rebounds: number | null;
+  assists: number | null;
+  steals: number | null;
+  blocks: number | null;
+  turnovers: number | null;
+  fg_pct: number | null;
+  fg3_pct: number | null;
+  ft_pct: number | null;
+  plus_minus: number | null;
+}
+
+export interface CareerRow {
+  season_id: string;
+  team_abbr: string | null;
+  games_played: number | null;
+  minutes: number | null;
+  points: number | null;
+  rebounds: number | null;
+  assists: number | null;
+  steals: number | null;
+  blocks: number | null;
+  turnovers: number | null;
+  fg_pct: number | null;
+  fg3_pct: number | null;
+  ft_pct: number | null;
+}
+
+export interface PlayerDetailResponse {
+  player_id: number;
+  name: string;
+  season: string;
+  season_type: string;
+  per_mode: string;
+  available: boolean;
+  message: string | null;
+  game_log: GameLogRow[];
+  career_season: CareerRow[];
+  career_total: CareerRow | null;
 }

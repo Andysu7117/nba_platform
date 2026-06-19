@@ -3,13 +3,15 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { TeamChip } from "../components/TeamChip";
 import { Icon } from "../components/Icon";
+import { SeasonSelect } from "../components/SeasonSelect";
 import { ErrorState, Spinner } from "../components/common";
 import type { BracketColumn, ChampionshipOdd, SeriesResult, SimulateResponse, TeamRef } from "../api/types";
 
 const N_SIMS = 2000;
 
 export function PlayoffSimulator() {
-  const seeds = useAsync(() => api.seeds(), []);
+  const [season, setSeason] = useState<string | undefined>(undefined);
+  const seeds = useAsync(() => api.seeds(season), [season]);
   const [sim, setSim] = useState<SimulateResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,12 +20,18 @@ export function PlayoffSimulator() {
     setBusy(true);
     setError(null);
     try {
-      setSim(await api.simulate(N_SIMS));
+      setSim(await api.simulate(N_SIMS, season));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
     } finally {
       setBusy(false);
     }
+  };
+
+  // Changing the season invalidates a prior simulation.
+  const onSeason = (s: string) => {
+    setSeason(s);
+    setSim(null);
   };
 
   return (
@@ -33,11 +41,14 @@ export function PlayoffSimulator() {
           <div className="eyebrow">BRACKET PROJECTION</div>
           <h1 className="h1">Playoff Simulator</h1>
         </div>
-        {!busy && (
-          <button className={sim ? "btn-ghost" : "btn"} style={sim ? undefined : { padding: "12px 22px" }} onClick={run}>
-            {sim ? "Re-simulate" : "Simulate Playoffs"}
-          </button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <SeasonSelect value={season} onChange={onSeason} />
+          {!busy && (
+            <button className={sim ? "btn-ghost" : "btn"} style={sim ? undefined : { padding: "12px 22px" }} onClick={run}>
+              {sim ? "Re-simulate" : "Simulate Playoffs"}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <ErrorState message={error} onRetry={run} />}
