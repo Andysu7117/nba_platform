@@ -70,6 +70,10 @@ def _normalise_scoreboard(header: pd.DataFrame, line: pd.DataFrame) -> pd.DataFr
         return pd.Series({"HOME_TEAM_ID": home, "VISITOR_TEAM_ID": visitor})
 
     gh[["HOME_TEAM_ID", "VISITOR_TEAM_ID"]] = gh.apply(_backfill, axis=1)
+    # ``apply`` returns Python objects, coercing the keys back to ``object``;
+    # restore ``Int64`` so the merges below line up with the LineScore dtypes.
+    gh["HOME_TEAM_ID"] = pd.to_numeric(gh["HOME_TEAM_ID"], errors="coerce").astype("Int64")
+    gh["VISITOR_TEAM_ID"] = pd.to_numeric(gh["VISITOR_TEAM_ID"], errors="coerce").astype("Int64")
 
     home = ls_small.rename(
         columns={

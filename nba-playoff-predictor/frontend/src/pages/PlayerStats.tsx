@@ -39,10 +39,6 @@ export function PlayerStats() {
   const [sortKey, setSortKey] = useState<SortKey>("points");
   const [sortDir, setSortDir] = useState<-1 | 1>(-1);
 
-  if (selected) {
-    return <PlayerDetail playerId={selected.id} initialName={selected.name} onBack={() => setSelected(null)} />;
-  }
-
   const rows = useMemo(() => {
     if (!data) return [];
     const q = search.toLowerCase().trim();
@@ -59,6 +55,12 @@ export function PlayerStats() {
       setSortDir(-1);
     }
   };
+
+  // Render the detail view only after all hooks above have run, so the hook
+  // order stays stable between the leaderboard and detail renders.
+  if (selected) {
+    return <PlayerDetail playerId={selected.id} initialName={selected.name} onBack={() => setSelected(null)} />;
+  }
 
   return (
     <div className="page">

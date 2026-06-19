@@ -87,8 +87,27 @@ export function PlayerDetail({
 
       {!loading && !error && data && data.available && (
         <>
+          {/* ---- Career tables ---- */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 0 12px", flexWrap: "wrap", gap: 10 }}>
+            <div className="display" style={{ fontWeight: 800, fontSize: 18 }}>
+              Career
+            </div>
+            <div className="seg-group">
+              {(["PerGame", "Totals"] as PerMode[]).map((m) => (
+                <button key={m} className={`seg${perMode === m ? " active" : ""}`} onClick={() => setPerMode(m)}>
+                  {m === "PerGame" ? "Per Game" : "Totals"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {data.career_season.length === 0 ? (
+            <EmptyState>No career data available.</EmptyState>
+          ) : (
+            <CareerTable rows={data.career_season} total={data.career_total} />
+          )}
+
           {/* ---- Game-log chart ---- */}
-          <div className="card" style={{ padding: 20, marginBottom: 18 }}>
+          <div className="card" style={{ padding: 20, margin: "24px 0 18px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
               <div className="display" style={{ fontWeight: 800, fontSize: 15 }}>
                 {statLabel} per game — {data.season.replace("-", "–")}
@@ -125,25 +144,6 @@ export function PlayerDetail({
 
           {/* ---- Game log table ---- */}
           {data.game_log.length > 0 && <GameLogTable rows={data.game_log} />}
-
-          {/* ---- Career tables ---- */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "24px 0 12px", flexWrap: "wrap", gap: 10 }}>
-            <div className="display" style={{ fontWeight: 800, fontSize: 18 }}>
-              Career
-            </div>
-            <div className="seg-group">
-              {(["PerGame", "Totals"] as PerMode[]).map((m) => (
-                <button key={m} className={`seg${perMode === m ? " active" : ""}`} onClick={() => setPerMode(m)}>
-                  {m === "PerGame" ? "Per Game" : "Totals"}
-                </button>
-              ))}
-            </div>
-          </div>
-          {data.career_season.length === 0 ? (
-            <EmptyState>No career data available.</EmptyState>
-          ) : (
-            <CareerTable rows={data.career_season} total={data.career_total} />
-          )}
         </>
       )}
     </div>
