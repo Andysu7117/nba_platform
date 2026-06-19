@@ -1,0 +1,14 @@
+streamlit
+pandas
+numpy
+scikit-learn
+plotly
+duckdb
+joblib
+nba_api
+pyarrow
+pytest
+
+# Optional, uncomment if you want gradient-boosted alternatives:
+# xgboost
+# lightgbm
