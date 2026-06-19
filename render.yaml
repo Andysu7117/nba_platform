@@ -1,0 +1,29 @@
+# Render Blueprint for the NBA Platform FastAPI backend.
+# Deploy: push this repo, then in Render → New → Blueprint, point at the repo.
+# The frontend deploys separately on Vercel and proxies /api here (see
+# nba-playoff-predictor/frontend/vercel.json).
+services:
+  - type: web
+    name: nba-platform-api
+    runtime: python
+    rootDir: nba-playoff-predictor
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/meta
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      # Not needed while the frontend uses Vercel rewrites (same-origin), but
+      # set this to your Vercel URL if you ever call the API cross-origin.
+      # - key: NBA_CORS_ORIGINS
+      #   value: https://your-app.vercel.app
+
+    # Free instances have an ephemeral filesystem that resets on each deploy and
+    # after the service spins down. The parquet cache in data/raw still works
+    # within a single instance lifetime. For a cache that survives restarts,
+    # upgrade off the free plan and attach a disk mounted at the data dir:
+    # disk:
+    #   name: nba-data
+    #   mountPath: /opt/render/project/src/nba-playoff-predictor/data
+    #   sizeGB: 1
