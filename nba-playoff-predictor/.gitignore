@@ -8,3 +8,9 @@ models/*.joblib
 models/*.json
 .env
 .DS_Store
+
+# ---- Frontend (Vite/React) ----
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*

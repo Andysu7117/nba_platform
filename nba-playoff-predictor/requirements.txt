@@ -1,12 +1,19 @@
-streamlit
+# ---- Web API ----
+fastapi
+uvicorn[standard]
+pydantic
+httpx  # used by FastAPI's TestClient
+
+# ---- Data / modelling ----
 pandas
 numpy
 scikit-learn
-plotly
 duckdb
 joblib
 nba_api
 pyarrow
+
+# ---- Tests ----
 pytest
 
 # Optional, uncomment if you want gradient-boosted alternatives:

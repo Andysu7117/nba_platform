@@ -1,95 +1,102 @@
-# 🏀 NBA Playoff Predictor
+# 🏀 Hardwood — NBA Platform
 
-A full-stack Python MVP that predicts NBA regular-season game winners, simulates
-playoff series and brackets from predicted probabilities, and visualises player
-and team statistics — all in an interactive Streamlit dashboard.
+A full-stack NBA analytics platform:
+
+- **Backend** — a modular **FastAPI** service that wraps the data-science domain
+  code (`src/`) behind clean, typed JSON routes.
+- **Frontend** — a **React + TypeScript + Vite** single-page app (the "Hardwood"
+  design) that talks to the API over `/api`.
+
+It predicts regular-season game winners, simulates the playoff bracket, and
+visualises standings, schedules and league-wide player stats — all from
+**pre-game features only** (Elo, rolling last-10 form, rest) with a time-based
+train/test split to avoid leakage. The baseline model is a logistic regression.
 
 > ⚠️ Educational baseline only. **Not betting advice.**
 
 ---
 
-## Features
-
-- **Regular-season game prediction** — logistic-regression model trained on
-  leakage-free pre-game features.
-- **Playoff simulation** — Monte-Carlo best-of-seven series (2-2-1-1-1 home
-  court) and full 16-team bracket simulation.
-- **Player stat visualisation** — per-game charts with rolling 5-game averages,
-  plus season-by-season and career tables (toggle per-game / totals).
-- **Team stat visualisation** — scoring, plus-minus, and rolling last-10 trends.
-- **Schedule / current season** — pick any date (defaults to today): upcoming
-  games show each team's predicted win %, finished games show the final score
-  and an expandable box score.
-- **Local caching** — NBA API responses are cached to parquet so endpoints are
-  not hit repeatedly, and the app stays usable from cache when the API is down.
-
-## Tech stack
-
-Python 3.10+ · Streamlit · pandas · numpy · scikit-learn · Plotly · DuckDB ·
-joblib · nba_api · pyarrow · pytest
-
-## Project layout
+## Architecture
 
 ```
 nba-playoff-predictor/
-├── app/                  # Streamlit UI (Home + 4 pages)
-├── data/                 # raw/ + processed/ caches, nba.duckdb
-├── models/               # saved model + metrics
-├── src/
-│   ├── config.py         # paths & constants
-│   ├── db/               # DuckDB helpers
-│   ├── ingest/           # NBA API fetch + parquet cache
-│   ├── features/         # rolling stats, Elo, dataset assembly
-│   ├── models/           # train / evaluate / predict
-│   └── simulation/       # series & bracket simulation
-└── tests/                # pytest suite
+├── api/                # FastAPI web layer (thin, framework-only)
+│   ├── main.py         #   app + router wiring  →  /api/*
+│   ├── reference/      #   static team metadata (conference, colour, city)
+│   ├── schemas/        #   Pydantic request/response models
+│   ├── services/       #   business logic bridging api ↔ src
+│   └── routers/        #   one module per resource group
+├── src/                # Domain logic (no web framework) — ingest, features,
+│                       #   model, simulation. Reusable from scripts & tests.
+├── scripts/            # Maintenance scripts (cache warming)
+├── frontend/           # React + TypeScript + Vite app
+│   └── src/
+│       ├── api/        #   typed client + types mirroring the schemas
+│       ├── components/ #   shared UI (Sidebar, TeamChip, box-score modal, …)
+│       ├── pages/      #   one component per screen
+│       ├── hooks/      #   useAsync data-fetching hook
+│       └── context/    #   theme (light/dark) provider
+└── tests/              # pytest (domain + API smoke tests)
 ```
+
+The web layer never touches pandas/sklearn directly — routers call
+`api.services`, which call `src`. That keeps `src` independently testable and the
+routers thin.
 
 ---
 
-## Setup
+## Quick start
+
+### 1. Backend (FastAPI)
 
 ```bash
-# 1. Create and activate a virtual environment
+cd nba-playoff-predictor
 python -m venv .venv
-
-# macOS / Linux
-source .venv/bin/activate
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
-
-# 2. Install dependencies
+source .venv/Scripts/activate        # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-## Train the model
-
-This fetches NBA data (caching it locally), builds the modelling dataset, trains
-the model, and saves it:
-
-```bash
+# Train the model + fetch/cache NBA data (first run only; needs internet):
 python -m src.models.train_game_model
+# Optional: warm the player-leaderboard cache:
+python -m scripts.fetch_player_leaderboard
+
+# Run the API (interactive docs at http://localhost:8000/api/docs):
+uvicorn api.main:app --reload
 ```
 
-Outputs:
-- `models/game_win_model.joblib`
-- `models/game_win_model_metrics.json`
-
-If the NBA API is unavailable, the command prints a clear, friendly error.
-
-## Run the app
+### 2. Frontend (React)
 
 ```bash
-streamlit run app/Home.py
+cd frontend
+npm install
+npm run dev          # http://localhost:5173  (proxies /api → :8000)
 ```
 
-The Home page shows whether a model exists and displays its saved metrics.
+Open <http://localhost:5173>.
 
-## Run tests
+---
 
-```bash
-pytest
-```
+## API overview
+
+All routes are mounted under `/api`; interactive docs live at `/api/docs`.
+
+| Method | Path                              | Purpose                                  |
+| ------ | --------------------------------- | ---------------------------------------- |
+| GET    | `/meta`                           | Current season, latest date, model flags |
+| GET    | `/meta/model`                     | Trained-model metrics                    |
+| GET    | `/teams`                          | All 30 teams + current records           |
+| GET    | `/standings?conference=East`      | Conference / league standings            |
+| GET    | `/schedule?date=YYYY-MM-DD`       | Games for a date (+ model win prob)      |
+| GET    | `/schedule/calendar?start=&end=`  | Per-day game counts (week strip)         |
+| GET    | `/games/{game_id}/boxscore`       | Player box score for a finished game     |
+| POST   | `/predict`                        | Win prob, projected score, key factors   |
+| GET    | `/playoffs/seeds`                 | Default top-8 seeds per conference        |
+| POST   | `/playoffs/simulate`              | Monte-Carlo bracket + championship odds  |
+| GET    | `/players`                        | League per-game leaderboard + leaders    |
+
+Standings, schedule, predictions and playoff simulation run **fully offline**
+from the cached parquet data. Box scores and the player leaderboard fetch live
+from the NBA API and degrade gracefully when it is unreachable.
 
 ---
 
@@ -97,33 +104,30 @@ pytest
 
 - **Baseline**: `LogisticRegression` inside a scikit-learn `Pipeline`
   (`SimpleImputer(median)` → `StandardScaler` → `LogisticRegression`).
-- **Elo ratings**: each team's strength is tracked game-to-game; the rating
-  attached to a game is the value *before* tip-off, with home-court advantage
-  applied to the win-probability estimate.
-- **Rolling last-10 stats**: points, plus-minus, rebounds, assists, turnovers,
-  etc., averaged over the previous 10 games.
-- **Rest days & back-to-backs**: days since each team's previous game.
-- **No data leakage**:
-  - rolling features use `shift(1)` so a game never sees its own box score;
-  - Elo ratings update only *after* a game is recorded;
-  - a **time-based** 80/20 train/test split (earliest games train, latest test)
-    instead of a random split.
-- **Evaluation**: accuracy, log loss, and Brier score on the held-out tail.
+- **Elo ratings**: each game uses the rating *before* tip-off, with home-court
+  advantage applied only to the win-probability estimate.
+- **Rolling last-10 stats** and **rest / back-to-back** flags, all `shift(1)`-ed
+  so a game never sees its own box score.
+- **No leakage**: Elo updates only after a game is recorded, and a **time-based**
+  80/20 split (earliest games train, latest test) replaces a random split.
+- **Evaluation**: accuracy, log loss, Brier score on the held-out tail.
+
+The frontend's projected scores and "key factors" are derived from each team's
+season rating profile (points for/against per game, net rating, win %).
+
+---
+
+## Tests
+
+```bash
+pytest                                   # domain + API smoke tests
+cd frontend && npm run typecheck && npm run build
+```
 
 ## Known limitations
 
-- `nba_api` endpoints can be **slow or temporarily unavailable**; the app falls
+- `nba_api` endpoints can be slow or temporarily unavailable; the platform falls
   back to cached data where possible.
-- Player **injuries / availability** are not modelled yet.
-- The model is a **baseline**, not tuned and **not betting advice**.
-- The playoff bracket is **manually selected** in this MVP (no live standings).
-
-## Future improvements
-
-- Advanced box-score / tracking features.
-- Injury and availability data.
-- Live standings to auto-build the bracket.
-- Gradient-boosted models (XGBoost / LightGBM).
-- Probability calibration (e.g. isotonic / Platt scaling).
-- Shot charts and richer player visualisations.
-- Cloud deployment.
+- Player injuries / availability are not modelled.
+- The model is an untuned baseline — **not betting advice**.
+- Off/def "ratings" are points scored/allowed per game (not per-100-possessions).
